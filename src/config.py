@@ -22,8 +22,8 @@ class PipelineConfig:
     model_name: str = "inceptionv3"
 
     # ------------------ Training ------------------
-    epochs: int = 10
-    fine_tune_epochs: int = 10
+    epochs: int = 20
+    fine_tune_epochs: int = 20
 
     learning_rate: float = 1e-4
     fine_tune_lr: float = 1e-5

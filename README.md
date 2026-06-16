@@ -99,8 +99,8 @@ python cli/train.py [ARGS]
 | `--data_dir` | `str` | `data/OCT` | Pfad | Basisverzeichnis des Datensatzes |
 | `--img_size` | `int` | `299` | `> 0` | Zielgröße der Bilder (quadratisch) |
 | `--batch_size` | `int` | `32` | `> 0` | Batch Size |
-| `--epochs` | `int` | `10` | `>= 0` | Anzahl Epochen Stage 1 (Feature Extraction) |
-| `--fine_tune_epochs` | `int` | `10` | `>= 0` | Zusätzliche Epochen für Fine-Tuning |
+| `--epochs` | `int` | `20` | `>= 0` | Anzahl Epochen Stage 1 (Feature Extraction) |
+| `--fine_tune_epochs` | `int` | `20` | `>= 0` | Zusätzliche Epochen für Fine-Tuning |
 | `--learning_rate` | `float` | `1e-4` | `> 0` | Lernrate Stage 1 |
 | `--fine_tune_lr` | `float` | `1e-5` | `> 0` | Lernrate für Fine-Tuning |
 | `--dropout` | `float` | `0.3` | `0.0 <= x < 1.0` | Dropout vor dem Classification Head |
