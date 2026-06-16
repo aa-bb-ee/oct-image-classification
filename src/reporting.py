@@ -5,14 +5,15 @@ import json
 from pathlib import Path
 
 import matplotlib.pyplot as plt
-from sklearn.metrics import ConfusionMatrixDisplay
+import numpy as np
+from sklearn.metrics import ConfusionMatrixDisplay, auc, roc_curve
 
 from src.evaluation import EvaluationResults
 from src.paths import ExperimentPaths
 
 
 def save_json(data: dict, path: Path) -> None:
-    """Speichert ein Dictionary formatiert als JSON-Datei."""
+    """Save a dictionary as a formatted JSON file."""
     with open(path, "w", encoding="utf-8") as f:
         json.dump(
             data,
@@ -27,7 +28,7 @@ def plot_training_curves(
     paths: ExperimentPaths,
 ) -> None:
     """
-    Speichert Lernkurven für Loss und Accuracy als PNG-Dateien.
+    Save training curves for loss and accuracy as PNG files.
     """
     if "loss" in history_dict and "val_loss" in history_dict:
         plt.figure(figsize=(8, 6))
@@ -75,7 +76,7 @@ def plot_confusion_matrix(
     paths: ExperimentPaths,
 ) -> None:
     """
-    Speichert die Confusion Matrix als PNG-Datei.
+    Save the test confusion matrix as a PNG file.
     """
     fig, ax = plt.subplots(figsize=(8, 8))
     ConfusionMatrixDisplay(
@@ -92,19 +93,103 @@ def plot_confusion_matrix(
     plt.close(fig)
 
 
+def plot_roc_curve(
+    results: EvaluationResults,
+    paths: ExperimentPaths,
+) -> None:
+    """
+    Save the ROC curve (One-vs-Rest) for each class as a PNG file.
+    """
+    class_names = results.summary["class_names"]
+    num_classes = len(class_names)
+    y_true_onehot = np.eye(num_classes)[results.y_true.astype(int)]
+
+    fig, ax = plt.subplots(figsize=(8, 6))
+
+    for i, name in enumerate(class_names):
+        try:
+            fpr, tpr, _ = roc_curve(y_true_onehot[:, i], results.y_prob[:, i])
+            roc_auc = auc(fpr, tpr)
+            ax.plot(fpr, tpr, label=f"{name} (AUC = {roc_auc:.2f})")
+        except ValueError:
+            continue
+
+    ax.plot([0, 1], [0, 1], "k--", linewidth=0.8)
+    ax.set_xlabel("False Positive Rate")
+    ax.set_ylabel("True Positive Rate")
+    ax.set_title("ROC Curve (One-vs-Rest)")
+    ax.legend(loc="lower right")
+    ax.grid(alpha=0.3)
+    plt.tight_layout()
+    plt.savefig(paths.fig_dir / f"{paths.run_id}_roc_curve.png", dpi=200)
+    plt.close(fig)
+
+
+def plot_entropy_histogram(
+    values: np.ndarray,
+    paths: ExperimentPaths,
+    filename: str,
+    title: str,
+    xlabel: str,
+) -> None:
+    """
+    Save a histogram for entropy-based uncertainty values.
+    """
+    plt.figure(figsize=(8, 6))
+    plt.hist(values, bins=30, edgecolor="black")
+    plt.xlabel(xlabel)
+    plt.ylabel("Number of Samples")
+    plt.title(title)
+    plt.grid(alpha=0.2)
+    plt.tight_layout()
+    plt.savefig(paths.fig_dir / filename, dpi=200)
+    plt.close()
+
+
+def export_entropy_artifacts(
+    results: EvaluationResults,
+    paths: ExperimentPaths,
+) -> None:
+    """
+    Export per-sample entropy values for downstream analysis.
+    """
+    test_entropy_df = {
+        "y_true": results.y_true,
+        "y_pred": results.y_pred,
+        "entropy": results.entropy,
+        "normalized_entropy": results.normalized_entropy,
+    }
+
+    import pandas as pd
+
+    pd.DataFrame(test_entropy_df).to_csv(
+        paths.met_dir / f"{paths.run_id}_test_entropy.csv",
+        index=False,
+    )
+
+
 def export_evaluation_artifacts(
     results: EvaluationResults,
     paths: ExperimentPaths,
 ) -> None:
     """
-    Exportiert Evaluationsartefakte:
-    - Classification Report als CSV
-    - Summary als JSON
+    Export evaluation artifacts:
+    - validation report as CSV
+    - test report as CSV
+    - test entropy values as CSV
+    - summary as JSON
     """
     results.classification_report_df.to_csv(
-        paths.met_dir / f"{paths.run_id}_report.csv",
+        paths.met_dir / f"{paths.run_id}_test_report.csv",
         index=True,
     )
+
+    results.val_classification_report_df.to_csv(
+        paths.met_dir / f"{paths.run_id}_validation_report.csv",
+        index=True,
+    )
+
+    export_entropy_artifacts(results, paths)
 
     save_json(
         results.summary,
@@ -118,8 +203,26 @@ def create_reports(
     paths: ExperimentPaths,
 ) -> None:
     """
-    Erzeugt alle Reports und Visualisierungen eines Experiments.
+    Create all reports and visualizations for an experiment.
     """
     plot_training_curves(history_dict, paths)
     plot_confusion_matrix(results, paths)
+    plot_roc_curve(results, paths)
+
+    plot_entropy_histogram(
+        values=results.entropy,
+        paths=paths,
+        filename=f"{paths.run_id}_test_entropy_histogram.png",
+        title="Test Entropy Distribution",
+        xlabel="Entropy",
+    )
+
+    plot_entropy_histogram(
+        values=results.normalized_entropy,
+        paths=paths,
+        filename=f"{paths.run_id}_test_normalized_entropy_histogram.png",
+        title="Test Normalized Entropy Distribution",
+        xlabel="Normalized Entropy",
+    )
+
     export_evaluation_artifacts(results, paths)

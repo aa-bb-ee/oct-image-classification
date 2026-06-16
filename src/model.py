@@ -17,7 +17,10 @@ def get_metrics(num_classes: int) -> list[keras.metrics.Metric]:
 
     if num_classes > 2:
         metrics.append(
-            keras.metrics.SparseTopKCategoricalAccuracy(k=2, name="top2_acc")
+            keras.metrics.SparseTopKCategoricalAccuracy(
+                k=2,
+                name="top2_acc",
+            )
         )
 
     return metrics
@@ -35,7 +38,6 @@ def build_augmentation_layer(config: PipelineConfig) -> keras.Sequential:
     )
 
 
-
 def get_preprocess_fn(model_name: str) -> Callable:
     """
     Liefert die zur Architektur passende Preprocessing-Funktion zurück.
@@ -48,18 +50,12 @@ def get_preprocess_fn(model_name: str) -> Callable:
     if model_name == "inceptionv3":
         return keras.applications.inception_v3.preprocess_input
 
-    # ------------------------------------------------------------
-    # Später hier ergänzen:
-    #
-    # if model_name == "resnet50":
-    #     return keras.applications.resnet50.preprocess_input
-    #
-    # if model_name == "efficientnetb0":
-    #     return keras.applications.efficientnet.preprocess_input
-    #
-    # if model_name == "efficientnetb3":
-    #     return keras.applications.efficientnet.preprocess_input
-    # ------------------------------------------------------------
+    if model_name == "resnet50":
+        return keras.applications.resnet50.preprocess_input
+
+    if model_name in ("efficientnetb0", "efficientnetb3"):
+        # Beide nutzen das gleiche EfficientNet-Preprocessing
+        return keras.applications.efficientnet.preprocess_input
 
     raise ValueError(f"Nicht unterstütztes Modell: {model_name}")
 
@@ -69,46 +65,43 @@ def build_backbone(config: PipelineConfig) -> keras.Model:
     Baut das vortrainierte Backbone ohne Classification Head.
     """
     model_name = config.model_name.lower()
+    input_shape = (config.img_size, config.img_size, 3)
 
     if model_name == "inceptionv3":
         base_model = keras.applications.InceptionV3(
             weights="imagenet",
             include_top=False,
-            input_shape=(config.img_size, config.img_size, 3),
+            input_shape=input_shape,
         )
         base_model.trainable = False
         return base_model
 
-    # ------------------------------------------------------------
-    # Später hier ergänzen:
-    #
-    # if model_name == "resnet50":
-    #     base_model = keras.applications.ResNet50(
-    #         weights="imagenet",
-    #         include_top=False,
-    #         input_shape=(config.img_size, config.img_size, 3),
-    #     )
-    #     base_model.trainable = False
-    #     return base_model
-    #
-    # if model_name == "efficientnetb0":
-    #     base_model = keras.applications.EfficientNetB0(
-    #         weights="imagenet",
-    #         include_top=False,
-    #         input_shape=(config.img_size, config.img_size, 3),
-    #     )
-    #     base_model.trainable = False
-    #     return base_model
-    #
-    # if model_name == "efficientnetb3":
-    #     base_model = keras.applications.EfficientNetB3(
-    #         weights="imagenet",
-    #         include_top=False,
-    #         input_shape=(config.img_size, config.img_size, 3),
-    #     )
-    #     base_model.trainable = False
-    #     return base_model
-    # ------------------------------------------------------------
+    if model_name == "resnet50":
+        base_model = keras.applications.ResNet50(
+            weights="imagenet",
+            include_top=False,
+            input_shape=input_shape,
+        )
+        base_model.trainable = False
+        return base_model
+
+    if model_name == "efficientnetb0":
+        base_model = keras.applications.EfficientNetB0(
+            weights="imagenet",
+            include_top=False,
+            input_shape=input_shape,
+        )
+        base_model.trainable = False
+        return base_model
+
+    if model_name == "efficientnetb3":
+        base_model = keras.applications.EfficientNetB3(
+            weights="imagenet",
+            include_top=False,
+            input_shape=input_shape,
+        )
+        base_model.trainable = False
+        return base_model
 
     raise ValueError(f"Nicht unterstütztes Modell: {model_name}")
 
@@ -138,7 +131,11 @@ def build_model(
     x = base_model(x, training=False)
 
     x = layers.GlobalAveragePooling2D(name="global_avg_pooling")(x)
-    x = layers.Dropout(config.dropout, seed=config.seed, name="head_dropout")(x)
+    x = layers.Dropout(
+        config.dropout,
+        seed=config.seed,
+        name="head_dropout",
+    )(x)
 
     outputs = layers.Dense(
         num_classes,
@@ -154,6 +151,7 @@ def build_model(
     )
 
     return model, base_model
+
 
 def compile_model(
     model: keras.Model,
