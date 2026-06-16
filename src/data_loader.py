@@ -102,7 +102,7 @@ def build_datasets(config: PipelineConfig) -> DatasetBundle:
         path=str(config.train_dir),
         img_size=config.img_size,
         batch_size=config.batch_size,
-        shuffle=False,
+        shuffle=True,
         seed=config.seed,
         validation_split=config.val_split,
         subset="validation",
