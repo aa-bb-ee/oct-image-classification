@@ -1,10 +1,32 @@
 # src/helpers.py
 from __future__ import annotations
 
+import math
 import json
 from pathlib import Path
 from typing import Any
 
+
+
+def clean_nans(obj: Any):
+    """Ersetzt NaN/Inf rekursiv durch None, damit JSON valide ist."""
+    if isinstance(obj, float):
+        if math.isnan(obj) or math.isinf(obj):
+            return None
+        return obj
+    if isinstance(obj, dict):
+        return {k: clean_nans(v) for k, v in obj.items()}
+    if isinstance(obj, list):
+        return [clean_nans(v) for v in obj]
+    return obj
+
+
+def save_json(path: Path, payload: dict[str, Any], indent: int = 4) -> None:
+    """Speichert ein Dictionary sauber formatiert als JSON-Datei ab."""
+    path.parent.mkdir(parents=True, exist_ok=True)
+    cleaned = clean_nans(payload)
+    with path.open("w", encoding="utf-8") as f:
+        json.dump(cleaned, f, indent=indent, ensure_ascii=False)
 
 def print_section(title: str, width: int = 78) -> None:
     """Gibt eine optisch hervorgehobene Überschrift im Terminal aus."""
@@ -21,13 +43,6 @@ def ensure_dir(path: Path) -> Path:
     """Stellt sicher, dass ein Verzeichnis existiert und gibt den Pfad zurück."""
     path.mkdir(parents=True, exist_ok=True)
     return path
-
-
-def save_json(path: Path, payload: dict[str, Any], indent: int = 4) -> None:
-    """Speichert ein Dictionary sauber formatiert als JSON-Datei ab."""
-    path.parent.mkdir(parents=True, exist_ok=True)
-    with path.open("w", encoding="utf-8") as f:
-        json.dump(payload, f, indent=indent, ensure_ascii=False)
 
 
 def load_json(path: Path) -> dict[str, Any]:

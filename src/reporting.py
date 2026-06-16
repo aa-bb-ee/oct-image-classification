@@ -1,8 +1,6 @@
 # src/reporting.py
 from __future__ import annotations
-
-import json
-from pathlib import Path
+from src.helpers import save_json
 
 import matplotlib.pyplot as plt
 import numpy as np
@@ -10,17 +8,6 @@ from sklearn.metrics import ConfusionMatrixDisplay, auc, roc_curve
 
 from src.evaluation import EvaluationResults
 from src.paths import ExperimentPaths
-
-
-def save_json(data: dict, path: Path) -> None:
-    """Save a dictionary as a formatted JSON file."""
-    with open(path, "w", encoding="utf-8") as f:
-        json.dump(
-            data,
-            f,
-            indent=4,
-            ensure_ascii=False,
-        )
 
 
 def plot_training_curves(
@@ -192,8 +179,8 @@ def export_evaluation_artifacts(
     export_entropy_artifacts(results, paths)
 
     save_json(
-        results.summary,
         paths.met_dir / f"{paths.run_id}_summary.json",
+        results.summary,
     )
 
 
