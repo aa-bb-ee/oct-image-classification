@@ -206,19 +206,9 @@ def main() -> None:
     print()
     print_kv("VAL Macro ROC-AUC OvR", f"{results.val_auc:.4f}")
     print_kv("VAL Weighted ROC-AUC OvR", f"{results.val_auc_weighted:.4f}")
-    print_kv("VAL Mean Entropy", f"{val_results['val_mean_entropy']:.4f}")
-    print_kv(
-        "VAL Mean Normalized Entropy",
-        f"{val_results['val_mean_normalized_entropy']:.4f}",
-    )
-    print_kv(
-        "VAL Mean Entropy Correct",
-        f"{val_results['val_mean_entropy_correct']:.4f}",
-    )
-    print_kv(
-        "VAL Mean Entropy Wrong",
-        f"{val_results['val_mean_entropy_wrong']:.4f}",
-    )
+    print_kv("VAL Mean Normalized Entropy", f"{val_results['val_mean_normalized_entropy']:.4f}")
+    print_kv("VAL Mean Entropy Correct", f"{val_results['val_mean_entropy_correct']:.4f}")
+    print_kv("VAL Mean Entropy Wrong",f"{val_results['val_mean_entropy_wrong']:.4f}",)
 
     print_classification_table(
         title="TEST",
@@ -232,24 +222,11 @@ def main() -> None:
     print_kv("TEST Weighted ROC-AUC OvR", f"{test_results['roc_auc_ovr_weighted']:.4f}")
 
     if "sparse_top_k_categorical_accuracy" in test_results:
-        print_kv(
-            "TEST Top-K Accuracy",
-            f"{test_results['sparse_top_k_categorical_accuracy']:.4f}",
-        )
+        print_kv("TEST Top-K Accuracy", f"{test_results['sparse_top_k_categorical_accuracy']:.4f}")
 
-    print_kv("TEST Mean Entropy", f"{test_results['test_mean_entropy']:.4f}")
-    print_kv(
-        "TEST Mean Normalized Entropy",
-        f"{test_results['test_mean_normalized_entropy']:.4f}",
-    )
-    print_kv(
-        "TEST Mean Entropy Correct",
-        f"{test_results['test_mean_entropy_correct']:.4f}",
-    )
-    print_kv(
-        "TEST Mean Entropy Wrong",
-        f"{test_results['test_mean_entropy_wrong']:.4f}",
-    )
+    print_kv("TEST Mean Normalized Entropy", f"{test_results['test_mean_normalized_entropy']:.4f}")
+    print_kv("TEST Mean Entropy Correct", f"{test_results['test_mean_entropy_correct']:.4f}")
+    print_kv("TEST Mean Entropy Wrong", f"{test_results['test_mean_entropy_wrong']:.4f}")
 
     print_section("Saved Artifacts")
     print_kv("Best Model", paths.best_model_path)
@@ -260,6 +237,15 @@ def main() -> None:
     print()
     print(f"[INFO] Results saved to: {paths.output_root}")
 
+    # Compact summary for copy & paste
+    print()
+    print("---- SUMMARY ----")
+    print_kv("Model ID", paths.run_id)
+    print_kv("TEST Accuracy", f"{results.summary['test_results']['manual_test_accuracy']:.4f}")
+    print_kv("TEST Loss", f"{test_loss:.4f}")
+    print_kv("TEST Macro F1", f"{results.summary['test_results']['macro_f1']:.4f}")
+    print_kv("TEST Macro ROC-AUC OvR", f"{results.summary['test_results']['roc_auc_ovr_macro']:.4f}")
+    print_kv("TEST Mean Normalized Entropy", f"{results.summary['test_results']['test_mean_normalized_entropy']:.4f}")
 
 if __name__ == "__main__":
     main()
