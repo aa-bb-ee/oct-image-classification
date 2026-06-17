@@ -141,7 +141,7 @@ def build_datasets(config: PipelineConfig) -> DatasetBundle:
         class_weights = compute_class_weights_from_counts(class_counts)
 
     # 4. Caching & Prefetching als allerletzten Schritt anwenden
-    train_ds = prepare_dataset(train_raw, take=-1, cache=config.cache)
+    train_ds = prepare_dataset(train_raw, take=-1, cache=False)
     val_ds = prepare_dataset(val_raw, take=-1, cache=config.cache)
     test_ds = prepare_dataset(test_raw, take=-1, cache=config.cache)
 

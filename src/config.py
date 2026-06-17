@@ -39,11 +39,12 @@ class PipelineConfig:
     val_take: int = -1
     test_take: int = -1
 
-    cache: bool = False
-    mixed_precision: bool = False
+    cache: bool = True
+    mixed_precision: bool = True
+
     fine_tune: bool = False
     use_class_weights: bool = False
-    use_augmentation: bool = True
+    use_augmentation: bool = False
 
     # ------------------ Project metadata ------------------
     project_name: str = "oct_project"
