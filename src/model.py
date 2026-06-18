@@ -50,10 +50,14 @@ def get_preprocess_fn(model_name: str) -> Callable:
     if model_name == "inceptionv3":
         return keras.applications.inception_v3.preprocess_input
 
+    if model_name in ("inceptionresnetv2", "inception_resnet_v2"):
+        return keras.applications.inception_resnet_v2.preprocess_input
+
     if model_name == "resnet50":
         return keras.applications.resnet50.preprocess_input
 
     if model_name in ("efficientnetb0", "efficientnetb3"):
+        # Beide nutzen das gleiche EfficientNet-Preprocessing
         return keras.applications.efficientnet.preprocess_input
 
     if model_name == "densenet121":
@@ -86,6 +90,16 @@ def build_backbone(config: PipelineConfig) -> keras.Model:
         )
         base_model.trainable = False
         return base_model
+
+    if model_name in ("inceptionresnetv2", "inception_resnet_v2"):
+        base_model = keras.applications.InceptionResNetV2(
+            weights="imagenet",
+            include_top=False,
+            input_shape=input_shape,
+        )
+        base_model.trainable = False
+        return base_model
+
 
     if model_name == "resnet50":
         base_model = keras.applications.ResNet50(
