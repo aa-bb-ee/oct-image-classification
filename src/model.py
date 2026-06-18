@@ -100,7 +100,6 @@ def build_backbone(config: PipelineConfig) -> keras.Model:
         base_model.trainable = False
         return base_model
 
-
     if model_name == "resnet50":
         base_model = keras.applications.ResNet50(
             weights="imagenet",
@@ -121,6 +120,60 @@ def build_backbone(config: PipelineConfig) -> keras.Model:
 
     if model_name == "efficientnetb3":
         base_model = keras.applications.EfficientNetB3(
+            weights="imagenet",
+            include_top=False,
+            input_shape=input_shape,
+        )
+        base_model.trainable = False
+        return base_model
+
+    if model_name == "densenet121":
+        base_model = keras.applications.DenseNet121(
+            weights="imagenet",
+            include_top=False,
+            input_shape=input_shape,
+        )
+        base_model.trainable = False
+        return base_model
+
+    if model_name == "convnexttiny":
+        base_model = keras.applications.ConvNeXtTiny(
+            weights="imagenet",
+            include_top=False,
+            input_shape=input_shape,
+        )
+        base_model.trainable = False
+        return base_model
+
+    if model_name == "convnextsmall":
+        base_model = keras.applications.ConvNeXtSmall(
+            weights="imagenet",
+            include_top=False,
+            input_shape=input_shape,
+        )
+        base_model.trainable = False
+        return base_model
+
+    if model_name == "convnextbase":
+        base_model = keras.applications.ConvNeXtBase(
+            weights="imagenet",
+            include_top=False,
+            input_shape=input_shape,
+        )
+        base_model.trainable = False
+        return base_model
+
+    if model_name == "convnextlarge":
+        base_model = keras.applications.ConvNeXtLarge(
+            weights="imagenet",
+            include_top=False,
+            input_shape=input_shape,
+        )
+        base_model.trainable = False
+        return base_model
+
+    if model_name == "convnextxlarge":
+        base_model = keras.applications.ConvNeXtXLarge(
             weights="imagenet",
             include_top=False,
             input_shape=input_shape,
