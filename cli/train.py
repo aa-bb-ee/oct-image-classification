@@ -28,6 +28,8 @@ def parse_args() -> argparse.Namespace:
     )
 
     parser.add_argument("--data_dir", type=str, default=None)
+    parser.add_argument("--train_subdir", type=str, default=None)
+    parser.add_argument("--test_subdir", type=str, default=None)
     parser.add_argument("--img_size", type=int, default=None)
     parser.add_argument("--batch_size", type=int, default=None)
 
@@ -82,6 +84,26 @@ def build_config(args: argparse.Namespace) -> PipelineConfig:
     return PipelineConfig(**overrides)
 
 
+def print_class_distribution(data) -> None:
+    print_section("Class Distribution")
+
+    for split_name, counts in (
+        ("Train", data.class_counts),
+        ("Validation", data.val_class_counts),
+        ("Test", data.test_class_counts),
+    ):
+        if counts is None:
+            continue
+
+        print(split_name)
+        for idx, class_name in enumerate(data.class_names):
+            print_kv(f"  {class_name}", int(counts[idx]))
+
+    if data.class_weights is not None:
+        print_kv("Computed Weights", data.class_weights)
+
+
+
 def print_classification_table(
     title: str,
     report_df,
@@ -130,6 +152,8 @@ def main() -> None:
     print_kv("Run Name", config.run_name)
     print_kv("Model", config.model_name)
     print_kv("Data Directory", config.data_dir)
+    print_kv("Train Directory", config.train_dir)
+    print_kv("Test Directory", config.test_dir)
     print_kv("Image Size", config.img_size)
     print_kv("Batch Size", config.batch_size)
     print_kv("Stage 1 Epochs", config.epochs)
@@ -162,12 +186,7 @@ def main() -> None:
     print_kv("Validation Samples", data.val_samples)
     print_kv("Test Samples", data.test_samples)
     print_kv("Validation Order", "deterministic (shuffle=False)")
-
-    if data.class_counts is not None:
-        print_section("Class Weights")
-        for idx, class_name in enumerate(data.class_names):
-            print_kv(f"Train {class_name}", int(data.class_counts[idx]))
-        print_kv("Computed Weights", data.class_weights)
+    print_class_distribution(data)
 
     print_section("Training")
     _, history_dict = train_model(
