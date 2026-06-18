@@ -54,8 +54,19 @@ def get_preprocess_fn(model_name: str) -> Callable:
         return keras.applications.resnet50.preprocess_input
 
     if model_name in ("efficientnetb0", "efficientnetb3"):
-        # Beide nutzen das gleiche EfficientNet-Preprocessing
         return keras.applications.efficientnet.preprocess_input
+
+    if model_name == "densenet121":
+        return keras.applications.densenet.preprocess_input
+
+    if model_name in (
+        "convnexttiny",
+        "convnextsmall",
+        "convnextbase",
+        "convnextlarge",
+        "convnextxlarge",
+    ):
+        return lambda x: x
 
     raise ValueError(f"Nicht unterstütztes Modell: {model_name}")
 

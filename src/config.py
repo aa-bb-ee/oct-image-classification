@@ -121,6 +121,12 @@ class PipelineConfig:
             "efficientnetb3": "effb3",
             "cnn_scratch": "cnn",
             "inceptionv4": "incv4",
+            "densenet121": "dense121",
+            "convnexttiny": "cntiny",
+            "convnextsmall": "cnsmall",
+            "convnextbase": "cnbase",
+            "convnextlarge": "cnlarge",
+            "convnextxlarge": "cnxlarge",
         }
 
         model_part = model_map.get(
