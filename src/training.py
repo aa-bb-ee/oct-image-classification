@@ -30,6 +30,18 @@ def _build_config_payload(
             for i in range(data.num_classes)
         }
 
+    if data.val_class_counts is not None:
+        payload["val_class_counts"] = {
+            data.class_names[i]: int(data.val_class_counts[i])
+            for i in range(data.num_classes)
+        }
+
+    if data.test_class_counts is not None:
+        payload["test_class_counts"] = {
+            data.class_names[i]: int(data.test_class_counts[i])
+            for i in range(data.num_classes)
+        }
+
     if data.class_weights is not None:
         payload["class_weights"] = {
             str(k): float(v) for k, v in data.class_weights.items()

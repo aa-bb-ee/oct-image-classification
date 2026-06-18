@@ -189,6 +189,32 @@ def _build_summary(
             "train_samples_used": data.train_samples,
             "val_samples_used": data.val_samples,
             "test_samples_used": data.test_samples,
+            "class_distribution": {
+                "train": (
+                    {
+                        class_names[i]: int(data.class_counts[i])
+                        for i in range(data.num_classes)
+                    }
+                    if data.class_counts is not None
+                    else None
+                ),
+                "validation": (
+                    {
+                        class_names[i]: int(data.val_class_counts[i])
+                        for i in range(data.num_classes)
+                    }
+                    if data.val_class_counts is not None
+                    else None
+                ),
+                "test": (
+                    {
+                        class_names[i]: int(data.test_class_counts[i])
+                        for i in range(data.num_classes)
+                    }
+                    if data.test_class_counts is not None
+                    else None
+                ),
+            },
         },
         "test_results": {
             **eval_dict,
@@ -232,6 +258,7 @@ def evaluate_model(
     Load the best model and compute full validation and test metrics.
     """
     model = keras.models.load_model(
+
         paths.best_model_path,
         compile=False,
     )
