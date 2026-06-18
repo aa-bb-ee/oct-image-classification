@@ -22,6 +22,8 @@ class DatasetBundle:
     val_samples: int
     test_samples: int
     class_counts: np.ndarray | None
+    val_class_counts: np.ndarray | None
+    test_class_counts: np.ndarray | None
     class_weights: dict[int, float] | None
 
 
@@ -133,11 +135,12 @@ def build_datasets(config: PipelineConfig) -> DatasetBundle:
     val_samples = count_samples(val_raw)
     test_samples = count_samples(test_raw)
 
-    class_counts = None
+    class_counts = count_classes(train_raw, num_classes)
+    val_class_counts = count_classes(val_raw, num_classes)
+    test_class_counts = count_classes(test_raw, num_classes)
     class_weights = None
 
     if config.use_class_weights:
-        class_counts = count_classes(train_raw, num_classes)
         class_weights = compute_class_weights_from_counts(class_counts)
 
     # 4. Caching & Prefetching als allerletzten Schritt anwenden
@@ -155,5 +158,7 @@ def build_datasets(config: PipelineConfig) -> DatasetBundle:
         val_samples=val_samples,
         test_samples=test_samples,
         class_counts=class_counts,
+        val_class_counts=val_class_counts,
+        test_class_counts=test_class_counts,
         class_weights=class_weights,
     )
