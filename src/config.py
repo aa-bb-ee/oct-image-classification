@@ -116,6 +116,8 @@ class PipelineConfig:
         """
         model_map = {
             "inceptionv3": "incv3",
+            "inceptionresnetv2": "incresv2",
+            "inception_resnet_v2": "incresv2",
             "resnet50": "res50",
             "efficientnetb0": "effb0",
             "efficientnetb3": "effb3",
