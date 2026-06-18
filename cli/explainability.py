@@ -25,13 +25,13 @@ def parse_args() -> argparse.Namespace:
     parser = argparse.ArgumentParser(
         description="Grad-CAM visualizations for OCT classification models.",
     )
-    parser.add_argument("--model_path",    type=str, required=True)
-    parser.add_argument("--data_dir",      type=str, default=None)
-    parser.add_argument("--test_subdir",    type=str, default=None)
-    parser.add_argument("--batch_size",     type=int, default=None)
-    parser.add_argument("--num_per_class",  type=int, default=2)
-    parser.add_argument("--seed",          type=int, default=None)
-    parser.add_argument("--output_dir",    type=str, default=None)
+    parser.add_argument("--model_path", type=str, required=True)
+    parser.add_argument("--data_dir", type=str, default=None)
+    parser.add_argument("--test_subdir", type=str, default=None)
+    parser.add_argument("--batch_size", type=int, default=None)
+    parser.add_argument("--num_per_class", type=int, default=2)
+    parser.add_argument("--seed", type=int, default=None)
+    parser.add_argument("--output_dir", type=str, default=None)
     return parser.parse_args()
 
 
@@ -54,40 +54,63 @@ def collect_images(
     config: PipelineConfig,
     num_per_class: int,
 ) -> tuple[list[np.ndarray], list[int], list[str]]:
-    from src.data_loader import build_datasets
+    image_extensions = {".jpg", ".jpeg", ".png", ".bmp", ".tif", ".tiff"}
 
-    data = build_datasets(config)
-    imgs_by_class: list[list[np.ndarray]] = [[] for _ in range(data.num_classes)]
+    if not config.test_dir.exists():
+        raise FileNotFoundError(f"Test directory not found: {config.test_dir}")
 
-    for imgs, labels in data.test_ds:
-        imgs_np = imgs.numpy().astype("uint8")
-        labels_np = labels.numpy()
-        for img, label in zip(imgs_np, labels_np):
-            imgs_by_class[int(label)].append(img)
+    class_dirs = sorted(
+        [p for p in config.test_dir.iterdir() if p.is_dir()],
+        key=lambda p: p.name,
+    )
+    class_names = [p.name for p in class_dirs]
 
     out_imgs: list[np.ndarray] = []
     out_labels: list[int] = []
-    for class_idx in range(data.num_classes):
-        if not imgs_by_class[class_idx]:
-            continue
-        random.shuffle(imgs_by_class[class_idx])
-        chosen = imgs_by_class[class_idx][:num_per_class]
-        out_imgs.extend(chosen)
-        out_labels.extend([class_idx] * len(chosen))
 
-    return out_imgs, out_labels, data.class_names
+    for class_idx, class_dir in enumerate(class_dirs):
+        image_paths = sorted(
+            [
+                p
+                for p in class_dir.iterdir()
+                if p.is_file() and p.suffix.lower() in image_extensions
+            ]
+        )
+
+        if not image_paths:
+            continue
+
+        chosen = random.sample(
+            image_paths,
+            k=min(num_per_class, len(image_paths)),
+        )
+
+        for image_path in chosen:
+            img_bytes = tf.io.read_file(str(image_path))
+            img = tf.image.decode_image(
+                img_bytes,
+                channels=3,
+                expand_animations=False,
+            )
+            img = tf.image.resize(img, [config.img_size, config.img_size])
+            img = tf.cast(img, tf.uint8).numpy()
+
+            out_imgs.append(img)
+            out_labels.append(class_idx)
+
+    return out_imgs, out_labels, class_names
 
 
 # ---------- GRAD-CAM ---------- #
 
 def find_gradcam_layer(model: keras.Model) -> keras.layers.Layer:
-    """Sucht den Grad-CAM Feature-Layer: erst named, dann letzter 4D-Layer."""
+    """Sucht erst 'gradcam_features', sonst den letzten 4D-Layer."""
     try:
         return model.get_layer("gradcam_features")
     except ValueError:
         pass
 
-    candidates = []
+    candidates: list[keras.layers.Layer] = []
     for layer in model.layers:
         output_shape = getattr(layer, "output_shape", None)
         if output_shape is None and hasattr(layer, "output"):
@@ -97,8 +120,7 @@ def find_gradcam_layer(model: keras.Model) -> keras.layers.Layer:
 
     if not candidates:
         raise ValueError(
-            "Kein 4D-Feature-Map-Layer gefunden. "
-            "Bitte ein kompatibles Modell uebergeben.",
+            "No 4D feature-map layer found. Train a compatible model first.",
         )
 
     return candidates[-1]
@@ -115,21 +137,22 @@ def build_grad_model(
     model: keras.Model,
     gradcam_layer: keras.layers.Layer,
 ) -> keras.Model:
-    """Baut ein Hilfsmodell, das (gradcam_features, predictions) zurueckgibt."""
+    """Hilfsmodell mit Outputs: (feature maps, predictions)."""
     x = model.inputs[0]
     gradcam_output = None
 
     for layer in model.layers:
         if isinstance(layer, keras.layers.InputLayer):
             continue
+
         x = _call_layer(layer, x)
         if layer.name == gradcam_layer.name:
             gradcam_output = x
 
     if gradcam_output is None:
         raise ValueError(
-            f"Grad-CAM-Layer konnte nicht "
-            "mit dem geladenen Modell-Graph verbunden werden.",
+            f"Could not reconnect Grad-CAM layer '{gradcam_layer.name}' "
+            "inside the loaded model graph.",
         )
 
     return keras.Model(
@@ -145,10 +168,9 @@ def make_gradcam_heatmap(
     class_idx: int | None = None,
 ) -> np.ndarray:
     """
-    Berechnet die Grad-CAM Heatmap.
+    Berechnet eine Grad-CAM Heatmap.
 
-    img_array: shape (1, H, W, 3), uint8 -- kein manuelles Preprocessing noetig,
-               das Modell uebernimmt das intern.
+    img_array: shape (1, H, W, 3), float32/uint8.
     """
     img_tensor = tf.convert_to_tensor(img_array, dtype=tf.float32)
     gradcam_layer = find_gradcam_layer(model)
@@ -156,21 +178,17 @@ def make_gradcam_heatmap(
 
     with tf.GradientTape() as tape:
         conv_out, preds = grad_model(img_tensor, training=False)
-        tape.watch(conv_out)
         if class_idx is None:
             class_idx = int(tf.argmax(preds[0]))
         loss = preds[:, class_idx]
 
     grads = tape.gradient(loss, conv_out)
     if grads is None:
-        raise ValueError(
-            "Gradienten konnten nicht berechnet werden. "
-            "Gradient-Flow zum Grad-CAM-Layer ist unterbrochen.",
-        )
+        raise ValueError("Could not compute gradients for Grad-CAM.")
 
-    pooled_grads = tf.reduce_mean(grads, axis=(1, 2))   # (batch, C)
-    conv_out_0   = conv_out[0]                         # (H, W, C)
-    pooled_grads_0 = pooled_grads[0]                   # (C,)
+    pooled_grads = tf.reduce_mean(grads, axis=(1, 2))
+    conv_out_0 = conv_out[0]
+    pooled_grads_0 = pooled_grads[0]
 
     heatmap = tf.reduce_sum(conv_out_0 * pooled_grads_0, axis=-1)
     heatmap = tf.maximum(heatmap, 0)
@@ -184,9 +202,11 @@ def make_gradcam_heatmap(
 def overlay(img: np.ndarray, heatmap: np.ndarray) -> np.ndarray:
     h, w, _ = img.shape
     heatmap_resized = tf.image.resize(
-        heatmap[..., None], (h, w),
+        heatmap[..., None],
+        (h, w),
     ).numpy().squeeze()
     heatmap_resized = np.clip(heatmap_resized, 0, 1)
+
     colored = (plt.get_cmap("jet")(heatmap_resized)[..., :3] * 255).astype("uint8")
     blended = img.astype("float32") * 0.6 + colored.astype("float32") * 0.4
     return np.clip(blended, 0, 255).astype("uint8")
@@ -205,7 +225,7 @@ def default_output_dir(model_path: Path) -> Path:
 def main() -> None:
     args = parse_args()
 
-    model_path = Path(args.model_path)
+    model_path = Path(args.model_path).resolve()
 
     print_section("Loading Model")
     model = keras.models.load_model(model_path, compile=False)
