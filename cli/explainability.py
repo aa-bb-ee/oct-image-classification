@@ -205,7 +205,7 @@ def default_output_dir(model_path: Path) -> Path:
 def main() -> None:
     args = parse_args()
 
-    model_path = Path(args.model_path).resolve()
+    model_path = Path(args.model_path)
 
     print_section("Loading Model")
     model = keras.models.load_model(model_path, compile=False)
