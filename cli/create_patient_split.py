@@ -1,9 +1,7 @@
-# cli/create_patient_split_csv.py
-
 from pathlib import Path
-import random
 import csv
-from collections import defaultdict, Counter
+import random
+from collections import Counter, defaultdict
 
 DATA_ROOT = Path("data/OCT")
 TRAIN_DIR = DATA_ROOT / "train"
@@ -14,47 +12,69 @@ VAL_SPLIT = 0.10
 SEED = 42
 
 CLASS_NAMES = {"CNV", "DME", "DRUSEN", "NORMAL"}
+IMAGE_EXTENSIONS = {".jpg", ".jpeg", ".png", ".bmp", ".tif", ".tiff"}
 
 
 def extract_patient_id(filename: str) -> str:
     """
-    Beispiel:
+    Extract the patient ID from the filename.
+
+    Expected example:
     CNV-315649-12.jpeg -> patient_id = CNV-315649
     """
     stem = Path(filename).stem
     parts = stem.split("-")
+
     if len(parts) < 2:
-        raise ValueError(f"Kann patient_id nicht aus Dateiname ableiten: {filename}")
+        raise ValueError(f"Could not extract patient_id from filename: {filename}")
+
     return f"{parts[0]}-{parts[1]}"
 
 
 def infer_label(path: Path) -> str:
+    """
+    Infer the class label from the directory structure.
+
+    Expected example:
+    data/OCT/train/CNV/image.jpeg -> label = CNV
+    """
     for part in path.parts:
         if part.upper() in CLASS_NAMES:
             return part.upper()
-    raise ValueError(f"Kein Klassenlabel im Pfad gefunden: {path}")
+
+    raise ValueError(f"Could not infer class label from path: {path}")
 
 
-def collect_images_with_source_split(root: Path, fixed_split: str):
-    image_extensions = {".jpg", ".jpeg", ".png", ".bmp", ".tif", ".tiff"}
+def collect_images(root: Path, split_name: str):
+    """
+    Collect all images below a given root directory and assign a fixed split name.
+    """
     samples = []
 
     for path in root.rglob("*"):
-        if path.is_file() and path.suffix.lower() in image_extensions:
+        if path.is_file() and path.suffix.lower() in IMAGE_EXTENSIONS:
             label = infer_label(path)
             patient_id = extract_patient_id(path.name)
-            samples.append({
-                "filepath": str(path.as_posix()),
-                "filename": path.name,
-                "label": label,
-                "patient_id": patient_id,
-                "split": fixed_split,
-            })
+
+            samples.append(
+                {
+                    "filepath": str(path.as_posix()),
+                    "filename": path.name,
+                    "label": label,
+                    "patient_id": patient_id,
+                    "split": split_name,
+                }
+            )
 
     return samples
 
 
-def split_train_patients_into_train_val(train_samples, val_split, seed):
+def split_train_patients_into_train_val(train_samples, val_split: float, seed: int):
+    """
+    Split patients from the training folder into train and validation sets.
+
+    All images from the same patient stay in the same split.
+    """
     patient_to_samples = defaultdict(list)
     for sample in train_samples:
         patient_to_samples[sample["patient_id"]].append(sample)
@@ -71,28 +91,49 @@ def split_train_patients_into_train_val(train_samples, val_split, seed):
 
     split_samples = []
     for patient_id, samples in patient_to_samples.items():
-        split_name = "val" if patient_id in val_patients else "train"
+        assigned_split = "val" if patient_id in val_patients else "train"
+
         for sample in samples:
-            updated = sample.copy()
-            updated["split"] = split_name
-            split_samples.append(updated)
+            updated_sample = sample.copy()
+            updated_sample["split"] = assigned_split
+            split_samples.append(updated_sample)
 
     return split_samples, train_patients, val_patients
 
 
+def build_patient_label_counts(rows):
+    """
+    Count unique patients per split and label.
+
+    A patient is counted once per (split, label) combination, even if multiple
+    images exist for that patient within the same class.
+    """
+    patient_label_count_per_split = defaultdict(Counter)
+    seen = set()
+
+    for row in rows:
+        key = (row["split"], row["label"], row["patient_id"])
+        if key not in seen:
+            patient_label_count_per_split[row["split"]][row["label"]] += 1
+            seen.add(key)
+
+    return patient_label_count_per_split
+
+
 def main():
     if not TRAIN_DIR.exists():
-        raise FileNotFoundError(f"Train-Ordner nicht gefunden: {TRAIN_DIR}")
-    if not TEST_DIR.exists():
-        raise FileNotFoundError(f"Test-Ordner nicht gefunden: {TEST_DIR}")
+        raise FileNotFoundError(f"Training directory not found: {TRAIN_DIR}")
 
-    raw_train_samples = collect_images_with_source_split(TRAIN_DIR, fixed_split="train")
-    test_samples = collect_images_with_source_split(TEST_DIR, fixed_split="test")
+    if not TEST_DIR.exists():
+        raise FileNotFoundError(f"Test directory not found: {TEST_DIR}")
+
+    train_folder_samples = collect_images(TRAIN_DIR, split_name="train")
+    test_samples = collect_images(TEST_DIR, split_name="test")
 
     train_val_samples, train_patients, val_patients = split_train_patients_into_train_val(
-        raw_train_samples,
+        train_folder_samples,
         val_split=VAL_SPLIT,
-        seed=SEED
+        seed=SEED,
     )
 
     all_rows = train_val_samples + test_samples
@@ -101,16 +142,16 @@ def main():
     with OUTPUT_CSV.open("w", newline="", encoding="utf-8") as f:
         writer = csv.DictWriter(
             f,
-            fieldnames=["filepath", "filename", "label", "patient_id", "split"]
+            fieldnames=["filepath", "filename", "label", "patient_id", "split"],
         )
         writer.writeheader()
         writer.writerows(all_rows)
 
     test_patients = {row["patient_id"] for row in test_samples}
 
-    assert train_patients.isdisjoint(val_patients), "Leakage zwischen train und val"
-    assert train_patients.isdisjoint(test_patients), "Leakage zwischen train und test"
-    assert val_patients.isdisjoint(test_patients), "Leakage zwischen val und test"
+    assert train_patients.isdisjoint(val_patients), "Leakage detected between train and val"
+    assert train_patients.isdisjoint(test_patients), "Leakage detected between train and test"
+    assert val_patients.isdisjoint(test_patients), "Leakage detected between val and test"
 
     image_count_per_split = Counter(row["split"] for row in all_rows)
     patient_count_per_split = {
@@ -123,19 +164,39 @@ def main():
     for row in all_rows:
         label_count_per_split[row["split"]][row["label"]] += 1
 
-    print(f"CSV gespeichert unter: {OUTPUT_CSV}")
+    patient_label_count_per_split = build_patient_label_counts(all_rows)
 
-    print("\nPatienten pro split:")
-    for split, count in patient_count_per_split.items():
-        print(f"  {split}: {count}")
+    label_order = ["CNV", "DME", "DRUSEN", "NORMAL"]
 
-    print("\nBilder pro split:")
-    for split, count in image_count_per_split.items():
-        print(f"  {split}: {count}")
+    print(f"\nCSV saved to: {OUTPUT_CSV}")
 
-    print("\nKlassenverteilung pro split:")
-    for split in ["train", "val", "test"]:
-        print(f"  {split}: {dict(label_count_per_split[split])}")
+    header = (
+        f"{'Class':<10} "
+        f"{'Train Patients':>14} {'Train Images':>14} "
+        f"{'Val Patients':>12} {'Val Images':>12} "
+        f"{'Test Patients':>13} {'Test Images':>12}"
+    )
+
+    print("\nSplit summary")
+    print(header)
+    print("-" * len(header))
+
+    total_line = (
+        f"{'TOTAL':<10} "
+        f"{patient_count_per_split['train']:>14} {image_count_per_split['train']:>14} "
+        f"{patient_count_per_split['val']:>12} {image_count_per_split['val']:>12} "
+        f"{patient_count_per_split['test']:>13} {image_count_per_split['test']:>12}"
+    )
+    print(total_line)
+
+    for label in label_order:
+        line = (
+            f"{label:<10} "
+            f"{patient_label_count_per_split['train'][label]:>14} {label_count_per_split['train'][label]:>14} "
+            f"{patient_label_count_per_split['val'][label]:>12} {label_count_per_split['val'][label]:>12} "
+            f"{patient_label_count_per_split['test'][label]:>13} {label_count_per_split['test'][label]:>12}"
+        )
+        print(line)
 
 
 if __name__ == "__main__":
