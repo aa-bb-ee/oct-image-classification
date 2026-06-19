@@ -22,6 +22,8 @@ from src.training import train_model
 
 from src.data_loader import build_patient_split_datasets
 
+#TODO:
+#patient level split in json/summary etc vermerken
 
 def parse_args() -> argparse.Namespace:
     """Parse all CLI arguments for an OCT training run with patient-level splitting."""
@@ -29,12 +31,36 @@ def parse_args() -> argparse.Namespace:
         description="OCT training pipeline with patient-level split"
     )
 
+    # ------------------ Data ------------------
     parser.add_argument("--data_dir", type=str, default=None)
     parser.add_argument("--train_subdir", type=str, default=None)
     parser.add_argument("--test_subdir", type=str, default=None)
     parser.add_argument("--img_size", type=int, default=None)
     parser.add_argument("--batch_size", type=int, default=None)
 
+    # ------------------ Training mode ------------------
+    # - --train_mode steuert, ob stage1, full oder finetune läuft.
+    # - --base_model_path wird für train_mode='finetune' gebraucht.
+    parser.add_argument(
+        "--train_mode",
+        type=str,
+        choices=["stage1", "full", "finetune"],
+        default=None,
+        help=(
+            "stage1 = frozen backbone only, "
+            "full = stage1 + fine-tuning, "
+            "finetune = load existing model and run only stage2"
+        ),
+    )
+
+    parser.add_argument(
+        "--base_model_path",
+        type=str,
+        default=None,
+        help="Path to an existing .keras model. Required for train_mode='finetune'.",
+    )
+
+    # ------------------ Training hyperparameters ------------------
     parser.add_argument("--epochs", type=int, default=None)
     parser.add_argument("--fine_tune_epochs", type=int, default=None)
 
@@ -44,6 +70,7 @@ def parse_args() -> argparse.Namespace:
     parser.add_argument("--dropout", type=float, default=None)
     parser.add_argument("--unfreeze_last_n", type=int, default=None)
 
+    # ------------------ Run control ------------------
     parser.add_argument("--run_name", type=str, default=None)
     parser.add_argument("--model_name", type=str, default=None)
     parser.add_argument("--gpu_index", type=int, default=None)
@@ -55,12 +82,14 @@ def parse_args() -> argparse.Namespace:
     parser.add_argument("--seed", type=int, default=None)
     parser.add_argument("--val_split", type=float, default=None)
 
+    # ------------------ Boolean flags ------------------
     parser.add_argument("--cache", action=argparse.BooleanOptionalAction, default=None)
     parser.add_argument("--mixed_precision", action=argparse.BooleanOptionalAction, default=None)
     parser.add_argument("--fine_tune", action=argparse.BooleanOptionalAction, default=None)
     parser.add_argument("--use_class_weights", action=argparse.BooleanOptionalAction, default=None)
     parser.add_argument("--use_augmentation", action=argparse.BooleanOptionalAction, default=None)
 
+    # Only print run name without training (for debugging)
     parser.add_argument(
         "--dry_run_name",
         action="store_true",
@@ -234,6 +263,35 @@ def print_patient_split_summary(data) -> None:
         print_kv("Split Description", split_description)
 
 
+def print_training_mode_summary(config: PipelineConfig) -> None:
+    """
+    NEU:
+    Gibt den gewählten Trainingsmodus sauber im Log aus.
+
+    Dadurch sieht man direkt im .out-Log:
+    - ob nur Stage 1 läuft
+    - ob Full Training läuft
+    - ob ein bestehendes Modell geladen und nur fine-getuned wird
+    """
+    print_kv("Train Mode", config.train_mode)
+
+    if config.train_mode == "stage1":
+        print_kv("Stage 1 Epochs", config.epochs)
+        print_kv("Fine-Tuning Epochs", 0)
+        print_kv("Fine-Tune LR", "-")
+
+    elif config.train_mode == "full":
+        print_kv("Stage 1 Epochs", config.epochs)
+        print_kv("Fine-Tuning Epochs", config.fine_tune_epochs)
+        print_kv("Fine-Tune LR", config.fine_tune_lr)
+
+    elif config.train_mode == "finetune":
+        print_kv("Base Model Path", config.base_model_path)
+        print_kv("Stage 1 Epochs", 0)
+        print_kv("Fine-Tuning Epochs", config.fine_tune_epochs)
+        print_kv("Fine-Tune LR", config.fine_tune_lr)
+
+
 def main() -> None:
     args = parse_args()
     config = build_config(args)
@@ -265,16 +323,13 @@ def main() -> None:
     print_kv("Test Directory", config.test_dir)
     print_kv("Image Size", config.img_size)
     print_kv("Batch Size", config.batch_size)
-    print_kv("Stage 1 Epochs", config.epochs)
-    print_kv(
-        "Fine-Tuning Epochs",
-        config.fine_tune_epochs if config.fine_tune else 0,
-    )
+
+    # NEU:
+    # Die Stage-/Fine-Tune-Infos werden nicht mehr verstreut ausgegeben,
+    # sondern zentral über print_training_mode_summary().
+    print_training_mode_summary(config)
+
     print_kv("Learning Rate", config.learning_rate)
-    print_kv(
-        "Fine-Tune LR",
-        config.fine_tune_lr if config.fine_tune else "-",
-    )
     print_kv("Validation Split", config.val_split)
     print_kv("Seed", config.seed)
     print_kv("Data Augmentation", config.use_augmentation)
@@ -303,6 +358,16 @@ def main() -> None:
     print_class_distribution(data)
 
     print_section("Training")
+
+    # NEU:
+    # Verständliche Log-Ausgabe abhängig vom train_mode.
+    if config.train_mode == "stage1":
+        print("[INFO] Starting Stage 1 only: frozen backbone feature extraction.")
+    elif config.train_mode == "full":
+        print("[INFO] Starting full training: Stage 1 followed by Stage 2 fine-tuning.")
+    elif config.train_mode == "finetune":
+        print("[INFO] Starting Fine-Tune only: loading existing model and running Stage 2.")
+
     print("[INFO] Starting training on TRAIN patients only...")
     print("[INFO] Validation is computed on separate VALIDATION patients only...")
     print("[INFO] No patient from validation/test is used for weight updates.")
@@ -408,6 +473,11 @@ def main() -> None:
     print()
     print("---- SUMMARY ----")
     print_kv("Model ID", paths.run_id)
+
+    # NEU:
+    # Train Mode auch in der kompakten Abschlussübersicht ausgeben.
+    print_kv("Train Mode", config.train_mode)
+
     print_kv("Split Strategy", "PATIENT-LEVEL")
     print_kv("Evaluation Unit", "held-out patients")
     print_kv(

@@ -33,6 +33,24 @@ def parse_args() -> argparse.Namespace:
     parser.add_argument("--img_size", type=int, default=None)
     parser.add_argument("--batch_size", type=int, default=None)
 
+    # NEU:
+    # train_mode steuert die gesamte Trainingslogik.
+    # Default kommt aus PipelineConfig.
+    parser.add_argument(
+        "--train_mode",
+        type=str,
+        choices=["stage1", "full", "finetune"],
+        default=None,
+    )
+
+    # NEU:
+    # Für train_mode='finetune'
+    parser.add_argument(
+        "--base_model_path",
+        type=str,
+        default=None,
+    )
+
     parser.add_argument("--epochs", type=int, default=None)
     parser.add_argument("--fine_tune_epochs", type=int, default=None)
 
@@ -156,16 +174,26 @@ def main() -> None:
     print_kv("Test Directory", config.test_dir)
     print_kv("Image Size", config.img_size)
     print_kv("Batch Size", config.batch_size)
-    print_kv("Stage 1 Epochs", config.epochs)
-    print_kv(
-        "Fine-Tuning Epochs",
-        config.fine_tune_epochs if config.fine_tune else 0,
-    )
+    print_kv("Train Mode", config.train_mode)
+
+    if config.train_mode == "stage1":
+        print_kv("Stage 1 Epochs", config.epochs)
+        print_kv("Fine-Tuning Epochs", 0)
+        print_kv("Fine-Tune LR", "-")
+
+    elif config.train_mode == "full":
+        print_kv("Stage 1 Epochs", config.epochs)
+        print_kv("Fine-Tuning Epochs", config.fine_tune_epochs)
+        print_kv("Fine-Tune LR", config.fine_tune_lr)
+
+    elif config.train_mode == "finetune":
+        print_kv("Base Model Path", config.base_model_path)
+        print_kv("Stage 1 Epochs", 0)
+        print_kv("Fine-Tuning Epochs", config.fine_tune_epochs)
+        print_kv("Fine-Tune LR", config.fine_tune_lr)
+
     print_kv("Learning Rate", config.learning_rate)
-    print_kv(
-        "Fine-Tune LR",
-        config.fine_tune_lr if config.fine_tune else "-",
-    )
+
     print_kv("Validation Split", config.val_split)
     print_kv("Seed", config.seed)
     print_kv("Data Augmentation", config.use_augmentation)
@@ -194,6 +222,17 @@ def main() -> None:
         data=data,
         paths=paths,
     )
+
+    if config.train_mode == "stage1":
+        print("[INFO] Starting Stage 1 only: frozen backbone feature extraction.")
+
+    elif config.train_mode == "full":
+        print("[INFO] Starting full training: Stage 1 followed by Stage 2 fine-tuning.")
+
+    elif config.train_mode == "finetune":
+        print("[INFO] Starting Fine-Tune only: loading existing model and running Stage 2.")
+
+    print()
 
     print_section("Evaluation")
     results = evaluate_model(
@@ -260,6 +299,7 @@ def main() -> None:
     print()
     print("---- SUMMARY ----")
     print_kv("Model ID", paths.run_id)
+    print_kv("Train Mode", config.train_mode)
     print_kv("TEST Accuracy", f"{results.summary['test_results']['manual_test_accuracy']:.4f}")
     print_kv("TEST Loss", f"{test_loss:.4f}")
     print_kv("TEST Macro F1", f"{results.summary['test_results']['macro_f1']:.4f}")
