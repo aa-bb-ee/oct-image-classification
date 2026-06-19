@@ -21,6 +21,13 @@ class PipelineConfig:
     # ------------------ Model ------------------
     model_name: str = "inceptionv3"
 
+    # ------------------ Training mode ------------------
+    # stage1   = nur Feature Extraction
+    # full     = Stage 1 + Stage 2 Fine-Tuning
+    # finetune = bestehendes Modell laden und nur Stage 2 ausführen
+    train_mode: str = "full"
+    base_model_path: Path | None = None
+
     # ------------------ Training ------------------
     epochs: int = 20
     fine_tune_epochs: int = 20
@@ -53,6 +60,34 @@ class PipelineConfig:
 
     def __post_init__(self) -> None:
         self.data_dir = Path(self.data_dir)
+
+        if self.base_model_path is not None:
+            self.base_model_path = Path(self.base_model_path)
+
+        self.train_mode = self.train_mode.lower().strip()
+
+        if self.train_mode not in {"stage1", "full", "finetune"}:
+            raise ValueError(
+                "train_mode must be one of: 'stage1', 'full', 'finetune'."
+            )
+
+        # Backwards compatibility:
+        # Falls noch jemand --fine_tune nutzt, wird daraus automatisch full.
+        if self.fine_tune and self.train_mode == "stage1":
+            self.train_mode = "full"
+
+        # train_mode ist ab jetzt die zentrale Wahrheit.
+        self.fine_tune = self.train_mode in {"full", "finetune"}
+
+        if self.train_mode == "finetune":
+            if self.base_model_path is None:
+                raise ValueError(
+                    "base_model_path is required when train_mode='finetune'."
+                )
+            if not self.base_model_path.exists():
+                raise FileNotFoundError(
+                    f"base_model_path not found: {self.base_model_path}"
+                )
 
         if self.run_name is not None and not self.run_name.strip():
             raise ValueError("run_name must not be empty.")
@@ -108,6 +143,10 @@ class PipelineConfig:
         payload["data_dir"] = str(self.data_dir)
         payload["train_dir"] = str(self.train_dir)
         payload["test_dir"] = str(self.test_dir)
+
+        if self.base_model_path is not None:
+            payload["base_model_path"] = str(self.base_model_path)
+
         return payload
 
     def build_run_name(self) -> str:
