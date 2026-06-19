@@ -15,20 +15,21 @@ CLASS_NAMES = {"CNV", "DME", "DRUSEN", "NORMAL"}
 IMAGE_EXTENSIONS = {".jpg", ".jpeg", ".png", ".bmp", ".tif", ".tiff"}
 
 
+
 def extract_patient_id(filename: str) -> str:
     """
     Extract the patient ID from the filename.
 
     Expected example:
-    CNV-315649-12.jpeg -> patient_id = CNV-315649
+    CNV-315649-12.jpeg -> patient_id = 315649
     """
     stem = Path(filename).stem
     parts = stem.split("-")
 
-    if len(parts) < 2:
+    if len(parts) < 3:
         raise ValueError(f"Could not extract patient_id from filename: {filename}")
 
-    return f"{parts[0]}-{parts[1]}"
+    return parts[1]
 
 
 def infer_label(path: Path) -> str:
