@@ -28,12 +28,42 @@ def get_metrics(num_classes: int) -> list[keras.metrics.Metric]:
 
 def build_augmentation_layer(config: PipelineConfig) -> keras.Sequential:
     """Erstellt optional eine Data-Augmentation-Pipeline."""
+    aug_layers = []
+
+    if config.augmentation_flip != "none":
+        aug_layers.append(
+            layers.RandomFlip(
+                config.augmentation_flip,
+                seed=config.seed,
+            )
+        )
+
+    if config.augmentation_rotation > 0:
+        aug_layers.append(
+            layers.RandomRotation(
+                config.augmentation_rotation,
+                seed=config.seed,
+            )
+        )
+
+    if config.augmentation_zoom > 0:
+        aug_layers.append(
+            layers.RandomZoom(
+                config.augmentation_zoom,
+                seed=config.seed,
+            )
+        )
+
+    if config.augmentation_contrast > 0:
+        aug_layers.append(
+            layers.RandomContrast(
+                config.augmentation_contrast,
+                seed=config.seed,
+            )
+        )
+
     return keras.Sequential(
-        [
-            layers.RandomFlip("horizontal", seed=config.seed),
-            layers.RandomRotation(0.05, seed=config.seed),
-            layers.RandomZoom(0.10, seed=config.seed),
-        ],
+        aug_layers,
         name="data_augmentation",
     )
 

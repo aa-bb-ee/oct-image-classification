@@ -38,6 +38,12 @@ class PipelineConfig:
     dropout: float = 0.3
     unfreeze_last_n: int = 50
 
+    # ---------------- Augmentation ----------------
+    augmentation_rotation: float = 0.05
+    augmentation_zoom: float = 0.10
+    augmentation_flip: str = "horizontal"
+    augmentation_contrast: float = 0.0
+
     # ------------------ Run control ------------------
     run_name: str | None = None
     gpu_index: int = -1
@@ -125,6 +131,21 @@ class PipelineConfig:
         if self.unfreeze_last_n < 0:
             raise ValueError("unfreeze_last_n must not be negative.")
 
+        if not (0.0 <= self.augmentation_rotation <= 1.0):
+            raise ValueError("augmentation_rotation must be in the interval [0, 1].")
+
+        if not (0.0 <= self.augmentation_zoom <= 1.0):
+            raise ValueError("augmentation_zoom must be in the interval [0, 1].")
+
+        if self.augmentation_flip not in {"none", "horizontal", "vertical", "horizontal_and_vertical"}:
+            raise ValueError(
+                "augmentation_flip must be one of: "
+                "'none', 'horizontal', 'vertical', 'horizontal_and_vertical'."
+            )
+
+        if not (0.0 <= self.augmentation_contrast <= 1.0):
+            raise ValueError("augmentation_contrast must be in the interval [0, 1].")
+
         for attr_name in ("train_take", "val_take", "test_take"):
             value = getattr(self, attr_name)
             if value == 0 or value < -1:
@@ -183,7 +204,31 @@ class PipelineConfig:
             train_part = "frozen"
 
         cw_part = "cw" if self.use_class_weights else "nocw"
-        aug_part = "aug" if self.use_augmentation else "noaug"
+
+        aug_parts = []
+
+        if self.augmentation_flip != "none":
+            aug_parts.append("flip")
+
+        if self.augmentation_rotation > 0:
+            aug_parts.append(
+                f"rot{int(self.augmentation_rotation * 100)}"
+            )
+
+        if self.augmentation_zoom > 0:
+            aug_parts.append(
+                f"zoom{int(self.augmentation_zoom * 100)}"
+            )
+
+        if self.augmentation_contrast > 0:
+            aug_parts.append(
+                f"con{int(self.augmentation_contrast * 100)}"
+            )
+
+        if self.use_augmentation:
+            aug_part = "aug_" + "_".join(aug_parts)
+        else:
+            aug_part = "noaug"
 
         return "_".join(
             [

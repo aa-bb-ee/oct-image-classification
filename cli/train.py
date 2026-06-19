@@ -71,6 +71,11 @@ def parse_args() -> argparse.Namespace:
     parser.add_argument("--seed", type=int, default=None)
     parser.add_argument("--val_split", type=float, default=None)
 
+    parser.add_argument("--augmentation_rotation", type=float, default=None)
+    parser.add_argument("--augmentation_zoom", type=float, default=None)
+    parser.add_argument("--augmentation_flip", type=str, default=None)
+    parser.add_argument("--augmentation_contrast", type=float, default=None)
+
     parser.add_argument("--cache", action=argparse.BooleanOptionalAction, default=None)
     parser.add_argument("--mixed_precision", action=argparse.BooleanOptionalAction, default=None)
     parser.add_argument("--fine_tune", action=argparse.BooleanOptionalAction, default=None)
@@ -196,7 +201,14 @@ def main() -> None:
 
     print_kv("Validation Split", config.val_split)
     print_kv("Seed", config.seed)
+
     print_kv("Data Augmentation", config.use_augmentation)
+    if config.use_augmentation:
+        print_kv("Augmentation Flip", config.augmentation_flip)
+        print_kv("Augmentation Rotation", config.augmentation_rotation)
+        print_kv("Augmentation Zoom", config.augmentation_zoom)
+        print_kv("Augmentation Contrast", config.augmentation_contrast)
+
     print_kv("Class Weights", config.use_class_weights)
     print_kv("Mixed Precision", config.mixed_precision)
 

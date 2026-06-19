@@ -89,6 +89,12 @@ def parse_args() -> argparse.Namespace:
     parser.add_argument("--use_class_weights", action=argparse.BooleanOptionalAction, default=None)
     parser.add_argument("--use_augmentation", action=argparse.BooleanOptionalAction, default=None)
 
+    # ------------------ Augmentation Config ------------
+    parser.add_argument("--augmentation_rotation", type=float, default=None)
+    parser.add_argument("--augmentation_zoom", type=float, default=None)
+    parser.add_argument("--augmentation_flip", type=str, default=None)
+    parser.add_argument("--augmentation_contrast", type=float, default=None)
+
     # Only print run name without training (for debugging)
     parser.add_argument(
         "--dry_run_name",
@@ -332,7 +338,14 @@ def main() -> None:
     print_kv("Learning Rate", config.learning_rate)
     print_kv("Validation Split", config.val_split)
     print_kv("Seed", config.seed)
+
     print_kv("Data Augmentation", config.use_augmentation)
+    if config.use_augmentation:
+        print_kv("Augmentation Flip", config.augmentation_flip)
+        print_kv("Augmentation Rotation", config.augmentation_rotation)
+        print_kv("Augmentation Zoom", config.augmentation_zoom)
+        print_kv("Augmentation Contrast", config.augmentation_contrast)
+
     print_kv("Class Weights", config.use_class_weights)
     print_kv("Mixed Precision", config.mixed_precision)
     print_kv("Split Strategy", "PATIENT-LEVEL")
