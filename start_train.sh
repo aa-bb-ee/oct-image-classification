@@ -1,7 +1,7 @@
 #!/bin/bash
 set -e
 
-SPLIT_STRATEGY="patient"
+SPLIT_STRATEGY="image"
 ARGS=()
 
 while [[ $# -gt 0 ]]; do
