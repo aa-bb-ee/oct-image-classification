@@ -160,6 +160,19 @@ def _safe_column_name(value: str) -> str:
     )
 
 
+def _with_sort_metric_suffix(path: Path, sort_metric: str) -> Path:
+    """
+    Ergänzt die Sortiermetrik im Dateinamen.
+
+    Beispiel:
+    reports/model_comparison.csv
+    -> reports/model_comparison_sorted_by_test_accuracy.csv
+    """
+    return path.with_name(
+        f"{path.stem}_sorted_by_{sort_metric}{path.suffix}"
+    )
+
+
 def _add_per_class_metrics(
     row: dict[str, Any],
     report: dict[str, dict[str, Any]],
@@ -210,12 +223,6 @@ def _add_per_class_metrics(
 def _get_run_dir(summary_path: Path) -> Path:
     """
     Bestimmt den Run-Ordner aus dem Pfad zur Summary.
-
-    Erwartete Struktur:
-    experiment_outputs/<run_id>/reports/metrics/<run_id>_summary.json
-
-    summary_path.parents[2] ist dann:
-    experiment_outputs/<run_id>
     """
     return summary_path.parents[2]
 
@@ -226,12 +233,7 @@ def _find_report_path(
     kind: str,
 ) -> Path:
     """
-    NEU:
     Erzeugt den Pfad zum Test- oder Validation-Report.
-
-    kind:
-    - 'test'
-    - 'validation'
     """
     return summary_path.parent / f"{run_id}_{kind}_report.csv"
 
@@ -556,7 +558,10 @@ def main() -> None:
         print(f"Best model    : {best['model_name']}")
 
         print(f"Sort metric   : {args.sort_metric}")
-        print(f"Best value    : {_fmt(best.get(args.sort_metric))}")
+        print(
+            f"{args.sort_metric}: "
+            f"{_fmt(best.get(args.sort_metric))}"
+        )
 
         print(f"Best accuracy : {_fmt(best.get('test_accuracy'))}")
         print(f"Best macro F1 : {_fmt(best.get('test_macro_f1'))}")
