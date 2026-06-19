@@ -545,12 +545,15 @@ def main() -> None:
     args = parse_args()
     rows = sort_rows(load_rows(args.output_root), args.sort_metric)
 
-    write_csv(rows, args.output_csv)
-    write_markdown(rows, args.output_md)
+    output_csv = _with_sort_metric_suffix(args.output_csv, args.sort_metric)
+    output_md = _with_sort_metric_suffix(args.output_md, args.sort_metric)
+
+    write_csv(rows, output_csv)
+    write_markdown(rows, output_md)
 
     print(f"Runs compared : {len(rows)}")
-    print(f"CSV written   : {args.output_csv}")
-    print(f"Markdown      : {args.output_md}")
+    print(f"CSV written   : {output_csv}")
+    print(f"Markdown      : {output_md}")
     if rows:
         best = rows[0]
 
