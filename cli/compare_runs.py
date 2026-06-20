@@ -6,10 +6,15 @@ import json
 from pathlib import Path
 from typing import Any
 
+from openpyxl import Workbook
+from openpyxl.formatting.rule import ColorScaleRule
+from openpyxl.styles import Alignment, Font
+from openpyxl.utils import get_column_letter
 
 DEFAULT_OUTPUT_ROOT = Path("experiment_outputs")
 DEFAULT_OUTPUT_CSV = Path("reports/model_comparison.csv")
 DEFAULT_OUTPUT_MD = Path("reports/model_comparison.md")
+DEFAULT_OUTPUT_XLSX = Path("reports/model_comparison.xlsx")
 
 
 def parse_args() -> argparse.Namespace:
@@ -19,6 +24,7 @@ def parse_args() -> argparse.Namespace:
     parser.add_argument("--output_root", type=Path, default=DEFAULT_OUTPUT_ROOT)
     parser.add_argument("--output_csv", type=Path, default=DEFAULT_OUTPUT_CSV)
     parser.add_argument("--output_md", type=Path, default=DEFAULT_OUTPUT_MD)
+    parser.add_argument("--output_xlsx", type=Path, default=DEFAULT_OUTPUT_XLSX)
     parser.add_argument(
         "--sort_metric",
         default="test_accuracy",
@@ -476,6 +482,120 @@ def write_csv(rows: list[dict[str, Any]], path: Path) -> None:
             writer.writerow({key: row.get(key) for key in fieldnames})
 
 
+def write_xlsx(rows: list[dict[str, Any]], path: Path) -> None:
+    """
+    Schreibt den Modellvergleich als echte Excel-Datei.
+
+    Vorteil gegenüber CSV:
+    - Zahlen bleiben echte Zahlen
+    - keine Probleme mit Dezimalpunkt/Dezimalkomma
+    - Filter, Freeze Header und Farbskalen werden direkt gesetzt
+    """
+    path.parent.mkdir(parents=True, exist_ok=True)
+
+    wb = Workbook()
+    ws = wb.active
+    ws.title = "Model Comparison"
+
+    if not rows:
+        wb.save(path)
+        return
+
+    fieldnames = [key for key in rows[0].keys() if not key.startswith("_")]
+
+    ws.append(fieldnames)
+
+    for row in rows:
+        ws.append([row.get(key) for key in fieldnames])
+
+    # Header formatieren
+    for cell in ws[1]:
+        cell.font = Font(bold=True)
+        cell.alignment = Alignment(
+            text_rotation=45,
+            vertical="bottom",
+            horizontal="center",
+        )
+
+    # Header einfrieren und Filter aktivieren
+    ws.freeze_panes = "A2"
+    ws.auto_filter.ref = ws.dimensions
+
+    # Spaltenbreiten + Zahlenformat
+    metric_columns: list[str] = []
+
+    for col_idx, column_name in enumerate(fieldnames, start=1):
+        col_letter = get_column_letter(col_idx)
+
+        if column_name.endswith("_path"):
+            ws.column_dimensions[col_letter].width = 45
+        elif column_name in {"run_id", "run_name"}:
+            ws.column_dimensions[col_letter].width = 38
+        elif column_name == "model_name":
+            ws.column_dimensions[col_letter].width = 18
+        else:
+            ws.column_dimensions[col_letter].width = 16
+
+        # Metrikspalten erkennen
+        is_metric_col = (
+            column_name.startswith("test_")
+            or column_name.startswith("val_")
+        ) and not column_name.endswith("_path")
+
+        is_support_col = column_name.endswith("_support")
+
+        if is_metric_col:
+            metric_columns.append(col_letter)
+
+            for row_idx in range(2, ws.max_row + 1):
+                cell = ws[f"{col_letter}{row_idx}"]
+
+                if isinstance(cell.value, float):
+                    if is_support_col:
+                        cell.number_format = "0"
+                    else:
+                        cell.number_format = "0.0000"
+
+    # Farbskalen für Metriken:
+    # Bei Accuracy/F1/Recall/Precision/ROC-AUC ist höher besser.
+    for col_letter in metric_columns:
+        header = ws[f"{col_letter}1"].value
+
+        if header is None:
+            continue
+
+        header = str(header)
+
+        # Entropie: niedriger ist besser -> Grün niedrig, Rot hoch.
+        if "entropy" in header:
+            rule = ColorScaleRule(
+                start_type="min",
+                start_color="63BE7B",
+                mid_type="percentile",
+                mid_value=50,
+                mid_color="FFEB84",
+                end_type="max",
+                end_color="F8696B",
+            )
+        else:
+            rule = ColorScaleRule(
+                start_type="min",
+                start_color="F8696B",
+                mid_type="percentile",
+                mid_value=50,
+                mid_color="FFEB84",
+                end_type="max",
+                end_color="63BE7B",
+            )
+
+        ws.conditional_formatting.add(
+            f"{col_letter}2:{col_letter}{ws.max_row}",
+            rule,
+        )
+
+    wb.save(path)
+
+
 def _fmt(value: Any) -> str:
     if isinstance(value, float):
         return f"{value:.4f}"
@@ -547,13 +667,16 @@ def main() -> None:
 
     output_csv = _with_sort_metric_suffix(args.output_csv, args.sort_metric)
     output_md = _with_sort_metric_suffix(args.output_md, args.sort_metric)
+    output_xlsx = _with_sort_metric_suffix(args.output_xlsx, args.sort_metric)
 
     write_csv(rows, output_csv)
     write_markdown(rows, output_md)
+    write_xlsx(rows, output_xlsx)
 
     print(f"Runs compared : {len(rows)}")
     print(f"CSV written   : {output_csv}")
     print(f"Markdown      : {output_md}")
+    print(f"Excel written : {output_xlsx}")
     if rows:
         best = rows[0]
 
