@@ -154,7 +154,8 @@ def build_datasets(config: PipelineConfig) -> DatasetBundle:
     if config.use_class_weights:
         class_weights = compute_class_weights_from_counts(class_counts)
 
-    train_ds = prepare_dataset(train_raw, take=-1, cache=False)
+    # train_ds = prepare_dataset(train_raw, take=-1, cache=False)
+    train_ds = prepare_dataset(train_raw, take=-1, cache=config.cache)
     val_ds = prepare_dataset(val_raw, take=-1, cache=config.cache)
     test_ds = prepare_dataset(test_raw, take=-1, cache=config.cache)
 
@@ -378,7 +379,8 @@ def build_patient_split_datasets(config: PipelineConfig) -> DatasetBundle:
     if config.use_class_weights:
         class_weights = compute_class_weights_from_counts(class_counts)
 
-    train_ds = prepare_dataset(train_raw, take=-1, cache=False)
+    # train_ds = prepare_dataset(train_raw, take=-1, cache=False)
+    train_ds = prepare_dataset(train_raw, take=-1, cache=config.cache)
     val_ds = prepare_dataset(val_raw, take=-1, cache=config.cache)
     test_ds = prepare_dataset(test_raw, take=-1, cache=config.cache)
 
