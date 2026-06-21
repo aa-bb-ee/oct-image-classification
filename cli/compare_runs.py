@@ -87,6 +87,29 @@ def _load_run_config(summary_path: Path) -> dict[str, Any]:
     return _load_json(summary_path.parent / "run_config.json")
 
 
+def _load_history(summary_path: Path) -> dict[str, Any]:
+    return _load_json(summary_path.parent / "history.json")
+
+
+def _history_value_at_best_val_loss(
+    history: dict[str, Any],
+    key: str,
+) -> float | None:
+    val_loss = history.get("val_loss")
+    values = history.get(key)
+
+    if not val_loss or not values:
+        return None
+
+    best_idx = min(range(len(val_loss)), key=lambda i: val_loss[i])
+
+    if best_idx >= len(values):
+        return None
+
+    value = values[best_idx]
+    return float(value) if isinstance(value, (int, float)) else None
+
+
 def _load_classification_report_csv(path: Path) -> dict[str, dict[str, Any]]:
     """
     Lädt den von reporting.py exportierten Classification Report.
@@ -260,6 +283,7 @@ def load_rows(output_root: Path) -> list[dict[str, Any]]:
     for summary_path in sorted(output_root.rglob("*_summary.json")):
         summary = _load_json(summary_path)
         run_config = _load_run_config(summary_path)
+        history = _load_history(summary_path)
 
         run_dir = _get_run_dir(summary_path)
         run_id = summary.get("run_id", run_dir.name)
@@ -391,14 +415,12 @@ def load_rows(output_root: Path) -> list[dict[str, Any]]:
             # ============================================================
             # 4) Aggregated VALIDATION metrics
             # ============================================================
-            "val_accuracy": _get_float(
-                summary,
-                "validation_results",
-                "val_accuracy",
+            "val_accuracy": _history_value_at_best_val_loss(
+                history,
+            "val_accuracy",
             ),
-            "val_loss": _get_float(
-                summary,
-                "validation_results",
+            "val_loss": _history_value_at_best_val_loss(
+                history,
                 "val_loss",
             ),
             "val_macro_precision": _get_float(
@@ -581,9 +603,12 @@ def write_xlsx(rows: list[dict[str, Any]], path: Path) -> None:
 
         is_support_col = column_name.endswith("_support")
 
-        if is_metric_col:
-            metric_columns.append(col_letter)
+        no_color_scale = (
+                column_name == "val_split"
+                or column_name.endswith("_support")
+        )
 
+        if is_metric_col:
             for row_idx in range(2, ws.max_row + 1):
                 cell = ws[f"{col_letter}{row_idx}"]
 
@@ -592,6 +617,9 @@ def write_xlsx(rows: list[dict[str, Any]], path: Path) -> None:
                         cell.number_format = "0"
                     else:
                         cell.number_format = "0.0000"
+
+            if not no_color_scale:
+                metric_columns.append(col_letter)
 
     # Farbskalen für Metriken:
     # Bei Accuracy/F1/Recall/Precision/ROC-AUC ist höher besser.
