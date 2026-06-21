@@ -30,6 +30,7 @@ def parse_args() -> argparse.Namespace:
         default="test_accuracy",
         choices=[
             "test_accuracy",
+            "test_loss",
             "test_macro_precision",
             "test_macro_recall",
             "test_macro_f1",
@@ -38,6 +39,9 @@ def parse_args() -> argparse.Namespace:
             "test_weighted_f1",
             "test_roc_auc_macro",
             "test_roc_auc_weighted",
+
+            "val_accuracy",
+            "val_loss",
             "val_macro_precision",
             "val_macro_recall",
             "val_macro_f1",
@@ -85,7 +89,6 @@ def _load_run_config(summary_path: Path) -> dict[str, Any]:
 
 def _load_classification_report_csv(path: Path) -> dict[str, dict[str, Any]]:
     """
-    NEU:
     Lädt den von reporting.py exportierten Classification Report.
 
     reporting.py schreibt:
@@ -310,6 +313,11 @@ def load_rows(output_root: Path) -> list[dict[str, Any]]:
                 "test_results",
                 "manual_test_accuracy",
             ),
+            "test_loss": _get_float(
+                summary,
+                "test_results",
+                "loss",
+            ),
             "test_macro_precision": _get_float(
                 summary,
                 "test_results",
@@ -364,6 +372,16 @@ def load_rows(output_root: Path) -> list[dict[str, Any]]:
             # ============================================================
             # 4) Aggregated VALIDATION metrics
             # ============================================================
+            "val_accuracy": _get_float(
+                summary,
+                "validation_results",
+                "val_accuracy",
+            ),
+            "val_loss": _get_float(
+                summary,
+                "validation_results",
+                "val_loss",
+            ),
             "val_macro_precision": _get_float(
                 summary,
                 "validation_results",
@@ -567,7 +585,7 @@ def write_xlsx(rows: list[dict[str, Any]], path: Path) -> None:
         header = str(header)
 
         # Entropie: niedriger ist besser -> Grün niedrig, Rot hoch.
-        if "entropy" in header:
+        if "entropy" in header or "loss" in header:
             rule = ColorScaleRule(
                 start_type="min",
                 start_color="63BE7B",
@@ -619,6 +637,7 @@ def write_markdown(rows: list[dict[str, Any]], path: Path) -> None:
         "model",
         "mode",
         "accuracy",
+        "loss",
         "macro_precision",
         "macro_recall",
         "macro_f1",
@@ -645,6 +664,7 @@ def write_markdown(rows: list[dict[str, Any]], path: Path) -> None:
                     str(row.get("model_name")),
                     _fmt(row.get("train_mode")),
                     _fmt(row.get("test_accuracy")),
+                    _fmt(row.get("test_loss")),
                     _fmt(row.get("test_macro_precision")),
                     _fmt(row.get("test_macro_recall")),
                     _fmt(row.get("test_macro_f1")),
