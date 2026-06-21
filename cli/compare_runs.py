@@ -247,6 +247,13 @@ def _find_report_path(
     return summary_path.parent / f"{run_id}_{kind}_report.csv"
 
 
+def _is_fine_tuning_run(run_config: dict[str, Any]) -> bool:
+    train_mode = str(run_config.get("train_mode", "")).lower()
+    fine_tune = run_config.get("fine_tune")
+
+    return train_mode in {"full", "finetune"} or fine_tune is True
+
+
 def load_rows(output_root: Path) -> list[dict[str, Any]]:
     rows: list[dict[str, Any]] = []
 
@@ -292,15 +299,27 @@ def load_rows(output_root: Path) -> list[dict[str, Any]]:
             "train_mode": run_config.get("train_mode"),
             "base_model_path": run_config.get("base_model_path"),
             "fine_tune": run_config.get("fine_tune"),
-            "unfreeze_last_n": run_config.get("unfreeze_last_n"),
+            "unfreeze_last_n": (
+                run_config.get("unfreeze_last_n")
+                if _is_fine_tuning_run(run_config)
+                else 0
+            ),
             "use_class_weights": run_config.get("use_class_weights"),
             "use_augmentation": run_config.get("use_augmentation"),
             "dropout": run_config.get("dropout"),
             "learning_rate": run_config.get("learning_rate"),
-            "fine_tune_lr": run_config.get("fine_tune_lr"),
+            "fine_tune_lr": (
+                run_config.get("fine_tune_lr")
+                if _is_fine_tuning_run(run_config)
+                else 0
+            ),
             "batch_size": run_config.get("batch_size"),
             "epochs": run_config.get("epochs"),
-            "fine_tune_epochs": run_config.get("fine_tune_epochs"),
+            "fine_tune_epochs": (
+                run_config.get("fine_tune_epochs")
+                if _is_fine_tuning_run(run_config)
+                else 0
+            ),
             "img_size": run_config.get("img_size"),
             "seed": run_config.get("seed"),
             "val_split": run_config.get("val_split"),
